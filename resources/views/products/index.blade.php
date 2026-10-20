@@ -71,6 +71,13 @@
             margin: .25rem 0 0;
             font-size: .95rem;
         }
+        .nav-links a {
+            color: rgba(255,255,255,.75);
+            text-decoration: none;
+            transition: color .15s;
+        }
+        .nav-links a:hover { color: #fff; }
+        .nav-links .sep { color: rgba(255,255,255,.4); margin: 0 .4rem; }
 
         /* ── Card ────────────────────────────────── */
         .card-main {
@@ -250,7 +257,7 @@
             font-size: .9rem;
             color: var(--gray-700);
         }
-        .form-control:focus {
+        .form-control:focus, .form-select:focus {
             border-color: var(--primary);
             box-shadow: 0 0 0 3px rgba(79,70,229,.15);
         }
@@ -286,7 +293,11 @@
         <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
             <div>
                 <h1><i class="bi bi-box-seam me-2"></i>Manajemen Produk</h1>
-                <p>Day 12 — DataTables Server-Side, Export &amp; Column Visibility</p>
+                <p class="nav-links">
+                    Day 12 — DataTables Server-Side, Export &amp; Column Visibility
+                    <span class="sep">·</span>
+                    <a href="{{ route('categories.index') }}"><i class="bi bi-tags me-1"></i>Kelola Kategori</a>
+                </p>
             </div>
             <button class="btn btn-light fw-semibold" onclick="openAddModal()">
                 <i class="bi bi-plus-lg me-1"></i> Tambah Produk
@@ -359,7 +370,12 @@
                     </div>
                     <div class="mb-3">
                         <label for="inputCategory" class="form-label">Kategori <span class="text-danger">*</span></label>
-                        <input type="text" class="form-control" id="inputCategory" name="category" required maxlength="255" placeholder="Contoh: Smartphone, Laptop">
+                        <select class="form-select" id="inputCategory" name="category_id" required>
+                            <option value="" disabled selected>— Pilih Kategori —</option>
+                            @foreach($categories as $cat)
+                                <option value="{{ $cat->id }}">{{ $cat->name }}</option>
+                            @endforeach
+                        </select>
                     </div>
                     <div class="row">
                         <div class="col-md-6 mb-3">
@@ -571,9 +587,10 @@
                 { data: 'id', name: 'id', width: '50px' },
                 { data: 'name', name: 'name' },
                 {
-                    data: 'category',
-                    name: 'category',
+                    data: 'category_name',
+                    name: 'category_name',
                     render: function (data) {
+                        if (!data) return '<span class="text-muted fst-italic">—</span>';
                         return '<span class="badge-category">' + escapeHtml(data) + '</span>';
                     }
                 },
@@ -602,10 +619,18 @@
                     searchable: false,
                     className: 'text-center',
                     render: function (data, type, row) {
-                        return '<button class="btn-action btn-edit me-1" onclick="openEditModal(' + data + ')" title="Edit">' +
+                        // Gunakan data-* attributes — tidak ada string nama produk
+                        // yang disuntikkan langsung ke dalam atribut onclick.
+                        var safeName = escapeHtml(row.name);
+                        return '<button class="btn-action btn-edit me-1"' +
+                                   ' data-id="' + data + '"' +
+                                   ' title="Edit">' +
                                    '<i class="bi bi-pencil"></i>' +
                                '</button>' +
-                               '<button class="btn-action btn-delete" onclick="confirmDelete(' + data + ', \'' + escapeHtml(row.name).replace(/'/g, "\\'") + '\')" title="Hapus">' +
+                               '<button class="btn-action btn-delete"' +
+                                   ' data-id="' + data + '"' +
+                                   ' data-name="' + safeName + '"' +
+                                   ' title="Hapus">' +
                                    '<i class="bi bi-trash"></i>' +
                                '</button>';
                     }
@@ -672,6 +697,18 @@
         setTimeout(function () {
             $('#alertSuccess').fadeOut('slow', function () { $(this).remove(); });
         }, 4000);
+
+        // ── Event delegation untuk tombol aksi ───────────────────────────────
+        // Dipasang di dalam $(document).ready tapi di luar konfigurasi DataTables
+        // agar event handler tidak terduplikasi saat tabel di-redraw.
+        // Mengambil ID dan nama dari data-* attributes, bukan dari string onclick.
+        $('#productsTable').on('click', '.btn-edit', function () {
+            openEditModal($(this).data('id'));
+        });
+
+        $('#productsTable').on('click', '.btn-delete', function () {
+            confirmDelete($(this).data('id'), $(this).data('name'));
+        });
     });
 
     // ── CRUD Modal Functions ───────────────────────
@@ -689,7 +726,8 @@
             $('#productForm').attr('action', '/products/' + id);
             $('#formMethod').val('PUT');
             $('#inputName').val(product.name);
-            $('#inputCategory').val(product.category);
+            // Pre-select kategori berdasarkan category_id dari relasi
+            $('#inputCategory').val(product.category_id || '');
             $('#inputPrice').val(product.price);
             $('#inputStock').val(product.stock);
             new bootstrap.Modal('#productModal').show();

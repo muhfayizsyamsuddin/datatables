@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Models\Category;
 use App\Models\Product;
 use Illuminate\Database\Seeder;
 
@@ -9,89 +10,109 @@ class ProductSeeder extends Seeder
 {
     /**
      * Seed the application's database with realistic products.
-     * Uses updateOrCreate to avoid duplicating data on repeated runs.
+     *
+     * Strategy (safe for repeated runs):
+     * 1. Uses updateOrCreate keyed on `name` to avoid duplicates.
+     * 2. Resolves category_id by looking up the Category by name — CategorySeeder
+     *    MUST run first (guaranteed by DatabaseSeeder call order).
+     * 3. Also writes the `category` text column for backward compatibility.
+     * 4. If a category name does not exist in the DB, the product is skipped
+     *    with a warning rather than crashing.
      */
     public function run(): void
     {
         $products = [
             [
-                'name' => 'Samsung Galaxy S24 Ultra',
+                'name'     => 'Samsung Galaxy S24 Ultra',
                 'category' => 'Smartphone',
-                'price' => 17999000,
-                'stock' => 25,
+                'price'    => 17999000,
+                'stock'    => 25,
             ],
             [
-                'name' => 'MacBook Air M3 15"',
+                'name'     => 'MacBook Air M3 15"',
                 'category' => 'Laptop',
-                'price' => 21499000,
-                'stock' => 12,
+                'price'    => 21499000,
+                'stock'    => 12,
             ],
             [
-                'name' => 'Sony WH-1000XM5',
+                'name'     => 'Sony WH-1000XM5',
                 'category' => 'Headphone',
-                'price' => 4999000,
-                'stock' => 40,
+                'price'    => 4999000,
+                'stock'    => 40,
             ],
             [
-                'name' => 'iPad Pro M4 11"',
+                'name'     => 'iPad Pro M4 11"',
                 'category' => 'Tablet',
-                'price' => 16999000,
-                'stock' => 18,
+                'price'    => 16999000,
+                'stock'    => 18,
             ],
             [
-                'name' => 'Logitech MX Master 3S',
+                'name'     => 'Logitech MX Master 3S',
                 'category' => 'Accessories',
-                'price' => 1499000,
-                'stock' => 60,
+                'price'    => 1499000,
+                'stock'    => 60,
             ],
             [
-                'name' => 'ASUS ROG Strix G16',
+                'name'     => 'ASUS ROG Strix G16',
                 'category' => 'Laptop',
-                'price' => 24999000,
-                'stock' => 8,
+                'price'    => 24999000,
+                'stock'    => 8,
             ],
             [
-                'name' => 'Canon EOS R6 Mark II',
+                'name'     => 'Canon EOS R6 Mark II',
                 'category' => 'Camera',
-                'price' => 38999000,
-                'stock' => 5,
+                'price'    => 38999000,
+                'stock'    => 5,
             ],
             [
-                'name' => 'Nintendo Switch OLED',
+                'name'     => 'Nintendo Switch OLED',
                 'category' => 'Gaming Console',
-                'price' => 5499000,
-                'stock' => 30,
+                'price'    => 5499000,
+                'stock'    => 30,
             ],
             [
-                'name' => 'Samsung 34" Odyssey G5',
+                'name'     => 'Samsung 34" Odyssey G5',
                 'category' => 'Monitor',
-                'price' => 6499000,
-                'stock' => 15,
+                'price'    => 6499000,
+                'stock'    => 15,
             ],
             [
-                'name' => 'Mechanical Keyboard Keychron K8 Pro',
+                'name'     => 'Mechanical Keyboard Keychron K8 Pro',
                 'category' => 'Accessories',
-                'price' => 1899000,
-                'stock' => 45,
+                'price'    => 1899000,
+                'stock'    => 45,
             ],
             [
-                'name' => 'Google Pixel 9 Pro',
+                'name'     => 'Google Pixel 9 Pro',
                 'category' => 'Smartphone',
-                'price' => 15999000,
-                'stock' => 20,
+                'price'    => 15999000,
+                'stock'    => 20,
             ],
             [
-                'name' => 'Dell UltraSharp U2723QE 27"',
+                'name'     => 'Dell UltraSharp U2723QE 27"',
                 'category' => 'Monitor',
-                'price' => 8999000,
-                'stock' => 10,
+                'price'    => 8999000,
+                'stock'    => 10,
             ],
         ];
 
-        foreach ($products as $product) {
+        foreach ($products as $data) {
+            // Resolve category_id from the categories table
+            $category = Category::where('name', $data['category'])->first();
+
+            if (! $category) {
+                $this->command->warn("Category '{$data['category']}' not found — skipping product '{$data['name']}'.");
+                continue;
+            }
+
             Product::updateOrCreate(
-                ['name' => $product['name']],
-                $product
+                ['name' => $data['name']],
+                [
+                    'category'    => $data['category'],   // teks lama (backward compat)
+                    'category_id' => $category->id,        // FK ke tabel categories
+                    'price'       => $data['price'],
+                    'stock'       => $data['stock'],
+                ]
             );
         }
     }
